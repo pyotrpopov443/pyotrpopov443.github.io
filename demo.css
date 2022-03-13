@@ -1,11 +1,9 @@
 * {margin: 0;}
 
 .container {
-	background: red;
 	position: absolute;
 	width: 100vw;
-	height: 100vh;
-	height: -webkit-fill-available;
+	height: 50vh;
 }
 
 canvas {
