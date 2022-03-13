@@ -2,8 +2,9 @@
 
 .container {
 	position: absolute;
+	top: 1000px;
 	width: 100vw;
-	height: 50vh;
+	height: 100vh;
 }
 
 canvas {
