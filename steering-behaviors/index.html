@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>SteeringBehaviors</title>
+	<link rel="stylesheet" href="../demo.css">
+</head>
+<body>
+
+<div class="container">
+	<canvas id="canvas"></canvas>
+</div>
+
+<script src="../lib/math-functions.js"></script>
+<script src="../lib/text-functions.js"></script>
+<script src="../lib/vector.js"></script>
+
+<script src="particle.js"></script>
+<script>
+	const backgroundColor = '#f6f6f6';
+	const fontColor = '#333333';
+
+	const mouseSize = 50;
+	const particleRadius = 8;
+
+	let particles;
+
+	function setup() {
+		font("bold 200px sans-serif");
+		const points = textToPoints("4 0 4", canvas.width/2, canvas.height/2, particleRadius * 2);
+		particles = points.map(p => {
+			const particle = new Particle(p.x, p.y, particleRadius);
+			particle.position = new Vector(canvas.width/2, canvas.height/2);
+			particle.color = fontColor;
+			return particle;
+		});
+	}
+
+	function draw() {
+		background(backgroundColor);
+		const mouse = new Vector(mouseX, mouseY);
+		particles.forEach(particle => {
+			particle.update(mouse, mouseSize);
+			particle.show();
+		});
+	}
+
+</script>
+<script src="../lib/canvas-play.js"></script>
+
+</body>
+</html>
