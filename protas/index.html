@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Диффуры ИД</title>
+</head>
+<body>
+
+<div class="container">
+	<h3>Вычислитель заданий для индивидуальной работы</h3>
+	<label for="variant">n.</label>
+	<input type="text" id="variant" placeholder="an+b">
+	<div id="tasks">
+
+	</div>
+</div>
+
+<script>
+
+	const tasks = document.getElementById('tasks');
+	const input = document.getElementById('variant');
+
+	const savedFormula = getCookie('differential_equations');
+	if (savedFormula !== undefined) {
+		input.value = savedFormula;
+		updateTasks(input.value);
+	}
+
+	input.addEventListener('input', () => {
+		setCookie('differential_equations', input.value, 100);
+		updateTasks()
+	});
+
+	function updateTasks() {
+		tasks.innerHTML = '';
+		const formula = getFormula(input.value);
+		const column1 = document.createElement('div');
+		for (let n = 1; n <= 8; n++) {
+			const task = getTask(n, formula);
+			column1.append(task);
+		}
+		const column2 = document.createElement('div');
+		for (let n = 9; n <= 16; n++) {
+			const task = getTask(n, formula);
+			column2.append(task);
+		}
+		const row = document.createElement('div');
+		row.className = 'row';
+		row.append(column1, column2);
+		tasks.append(row);
+	}
+
+	function getTask(n, formula) {
+		const task = document.createElement('div');
+		task.innerHTML = `${n}.${1 + (formula(n) - 1) % 31}`;
+		if ([4, 5, 6].includes(n)) task.innerHTML += ' НЕ делать Коши';
+		if ([11].includes(n)) task.innerHTML += ' ДА делать Коши';
+		if ([16].includes(n)) task.innerHTML += ' совет: не делать Коши';
+		return task;
+	}
+
+	function getFormula(formulaString) {
+		const nPos = formulaString.indexOf("n");
+		const multString = formulaString.substring(0, nPos).replace(/[^\d]/g,'');
+		const addString = formulaString.substring(nPos + 1, formulaString.length).replace(/[^\d]/g,'');
+		const mult = multString.length > 0 ? parseInt(multString) : 1;
+		const add = parseInt(addString);
+		return function(n) {
+			return mult*n+add;
+		};
+	}
+
+	function setCookie(name, value, days) {
+		const date = new Date();
+		date.setTime(date.getTime() + (days*24*60*60*1000));
+		document.cookie = name + "=" + value +  "; expires=" + date.toUTCString() + "; path=/";
+	}
+
+	function getCookie(name) {
+		const value = `; ${document.cookie}`;
+		const parts = value.split(`; ${name}=`);
+		if (parts.length === 2) return parts.pop().split(';').shift();
+	}
+
+</script>
+
+<iframe id="iframe" class="iframe" src="https://psv4.userapi.com/c236331/u353762997/docs/d44/8074a36d899a/Kuznetsov-89-103.pdf?extra=idkhPkvN2LKPfn8KPMxiyBwUeq_y0JHuIgH7S4t8Um7on3XxGYx6LqguWROl7IjobibmEaVXJKV7eN7Er8FTSR0qchbbyMV4erdJO40iNn-xtxcsBnOXUmFsDlpjGO5OyMbz2Phk5wHPTL9GcTPV40WJ"
+		width="100%">
+</iframe>
+
+<style>
+	* {
+		margin: 0;
+	}
+	body {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		width: 100vw;
+		font-size: 14pt;
+	}
+	.row {
+		display: flex;
+		flex-wrap: wrap;
+	}
+	.row div {
+		flex: 1 1 12em;
+	}
+	.container {
+		margin: 15px;
+	}
+	iframe {
+		flex: 1;
+	}
+	input {
+		margin-left: -5px;
+	}
+</style>
+
+</body>
+</html>
