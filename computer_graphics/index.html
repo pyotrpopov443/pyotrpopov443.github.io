@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Lab1</title>
+</head>
+<body>
+
+<div class="rotator" draggable="true"></div>
+<div id="selector"></div>
+<canvas id="painter"></canvas>
+
+<div style="margin: 5px">
+	<button id="brush" class="tool">кисть</button>
+	<button id="selection" class="tool">выделение</button>
+	<button id="clear">очистить</button>
+</div>
+
+<style>
+	* {
+		user-select: none;
+	}
+	#painter {
+		box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.2);
+	}
+	#selector {
+		position: absolute;
+		z-index: 1;
+		border: 1px dashed black;
+		margin: 8px;
+		cursor: move;
+	}
+	.rotator {
+		position: absolute;
+		width: 20px;
+		height: 20px;
+		cursor: move;
+	}
+
+	.snippet {
+		margin: 5px;
+	}
+
+	.selected {
+		outline: 3px solid red;
+	}
+</style>
+
+<script>
+
+	class Selector {
+
+		constructor()
+		{
+			this.selector = document.getElementById('selector');
+			this.selectorRotator = document.querySelector('.rotator');
+			this.selector.style.display = 'none';
+
+			this.bindHandlers();
+		}
+
+		bindHandlers()
+		{
+			this.selectorRotator.addEventListener('dragstart', (e) => {
+				this.selectorCenterX = this.selector.offsetLeft + this.selector.offsetWidth / 2;
+				this.selectorCenterY = this.selector.offsetTop + this.selector.offsetHeight / 2;
+				this.startX = this.selectorRotator.getBoundingClientRect().x;
+				this.startY = this.selectorRotator.getBoundingClientRect().y;
+				this.startAngle = Math.atan2(this.startY - this.selectorCenterY, this.startX - this.selectorCenterX);
+			});
+
+			this.selectorRotator.addEventListener('drag', (e) => {
+				if (e.offsetY < 0)
+				{
+					return;
+				}
+
+				const angle = Math.atan2(e.offsetY + this.startY - this.selectorCenterY, e.offsetX + this.startX - this.selectorCenterX);
+				const deg = (angle - this.startAngle) * 180 / Math.PI;
+				this.selector.style.transform = `rotate(${deg}deg)`;
+			});
+
+			this.selector.addEventListener('mousemove', (e) => {
+				if (e.buttons > 0)
+				{
+					const left = parseInt(this.selector.style.left)
+					const top = parseInt(this.selector.style.top)
+					this.selector.style.left = (left + e.movementX) + 'px';
+					this.selector.style.top = (top + e.movementY) + 'px';
+				}
+			});
+		}
+
+		clear()
+		{
+			this.selector.style.backgroundImage = '';
+			this.selector.style.transform = '';
+			this.selector.style.width = '0px';
+			this.selector.style.height = '0px';
+			this.selector.style.left = '0px';
+			this.selector.style.top = '0px';
+			this.selector.style.display = 'none';
+		}
+
+		startResize(x, y)
+		{
+			this.selector.style.pointerEvents = 'none';
+
+			this.selector.style.backgroundImage = '';
+			this.selector.style.transform = '';
+			this.selectStartX = x;
+			this.selectStartY = y;
+
+			this.selector.style.width = '0px';
+			this.selector.style.height = '0px';
+			this.selector.style.left = this.selectStartX + 'px';
+			this.selector.style.top = this.selectStartY + 'px';
+			this.selector.style.display = 'none';
+		}
+
+		resize(x, y)
+		{
+			if (this.selector.style.pointerEvents === 'none')
+			{
+				this.selector.style.display = '';
+				this.selector.style.width = (x - this.selectStartX) + 'px';
+				this.selector.style.height = (y - this.selectStartY) + 'px';
+			}
+		}
+
+		draw(canvas)
+		{
+			if (!this.image || this.selector.offsetWidth === 0 || this.selector.offsetHeight === 0)
+			{
+				return;
+			}
+
+			const x = this.selector.offsetLeft - canvas.offsetLeft + 1 + this.selector.offsetWidth / 2;
+			const y = this.selector.offsetTop - canvas.offsetTop + 1 + this.selector.offsetHeight / 2;
+			const deg = parseFloat(this.selector.style.transform.match(/[\d.]+/));
+			const angleInRadians = deg * Math.PI / 180;
+
+			const context = canvas.getContext('2d');
+			context.translate(x, y);
+			context.rotate(angleInRadians);
+			context.drawImage(this.image, -this.image.width / 2, -this.image.height / 2, this.image.width, this.image.height);
+			context.rotate(-angleInRadians);
+			context.translate(-x, -y);
+		}
+
+		copyCanvas(canvas)
+		{
+			if (this.selector.style.pointerEvents === 'none')
+			{
+				this.selectorRotator.style.left = (this.selector.offsetLeft + this.selector.offsetWidth + 5) + 'px';
+				this.selectorRotator.style.top = (this.selector.offsetTop - this.selectorRotator.offsetHeight - 5) + 'px';
+				if (this.selector.style.display === 'none')
+				{
+					return;
+				}
+				this.image = this.getSelection(canvas);
+				this.selector.style.backgroundImage = 'url(' + this.image.src + ')';
+				this.clearSelection(canvas);
+			}
+			this.selector.style.pointerEvents = '';
+		}
+
+		clearSelection(canvas)
+		{
+			const context = canvas.getContext('2d');
+			context.fillStyle = "#ffffff";
+			context.fillRect(this.selector.offsetLeft - canvas.offsetLeft + 1, this.selector.offsetTop - canvas.offsetTop + 1, this.selector.offsetWidth - 2, this.selector.offsetHeight - 2);
+		}
+
+		getSelection(canvas)
+		{
+			const context = canvas.getContext('2d');
+			const selection = context.getImageData(this.selector.offsetLeft - canvas.offsetLeft + 1, this.selector.offsetTop - canvas.offsetTop + 1, this.selector.offsetWidth - 2, this.selector.offsetHeight - 2);
+
+			const pix = selection.data;
+			for (let i = 0; i < pix.length; i += 4) {
+				if (pix[i] === 255 && pix[i + 1] === 255 && pix[i + 2] === 255)
+				{
+					pix[i + 3] = 0;
+				}
+			}
+
+			return this.getImageFromImageData(selection);
+		}
+
+		getImageFromImageData(imageData)
+		{
+			const canvas = document.createElement('canvas');
+			canvas.width = this.selector.offsetWidth;
+			canvas.height = this.selector.offsetHeight;
+			canvas.getContext('2d').putImageData(imageData, 0, 0);
+			const img = new Image();
+			img.src = canvas.toDataURL();
+			return img;
+		}
+
+	}
+
+	class Painter {
+		size = 4;
+		color = '#000000';
+		history = [];
+		snippetMode = false;
+		selectionMode = false;
+
+		constructor(canvas)
+		{
+			window.canvas = this;
+			this.canvas = canvas;
+			this.ctx = canvas.getContext("2d");
+			this.history.push(this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height));
+			this.clearButton = document.getElementById('clear');
+			this.selectButton = document.getElementById('selection');
+
+			this.selector = new Selector();
+
+			for (const snippet of this.snippets)
+			{
+				this.addSnippet(snippet);
+			}
+			this.setHandlers();
+		}
+
+		setSize(width, height)
+		{
+			this.canvas.width = width;
+			this.canvas.height = height;
+		}
+
+		setHandlers()
+		{
+			for (const tool of document.querySelectorAll('.tool'))
+			{
+				tool.addEventListener('click', () => {
+					this.disableAll();
+					tool.classList.add('selected');
+				});
+			}
+
+			this.canvas.addEventListener('mousedown', this.handleBrushDown.bind(this));
+			this.canvas.addEventListener('mousemove', this.handleBrushMove.bind(this));
+			this.canvas.addEventListener('mouseup', this.handleBrushUp.bind(this));
+			this.canvas.addEventListener('keydown', this.handleKeyDown.bind(this));
+			document.addEventListener('keydown', this.handleKeyDown.bind(this));
+
+			this.clearButton.addEventListener('click', this.clearCanvas.bind(this));
+			this.selectButton.addEventListener('click', () => {
+				this.selectionMode = true;
+			});
+		}
+
+		handleKeyDown(e)
+		{
+			const isCtrlZ = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z');
+			if (isCtrlZ)
+			{
+				this.popFromHistory();
+			}
+		}
+
+		handleBrushDown(e)
+		{
+			this.pushToHistory();
+			if (this.snippetMode)
+			{
+				this.drawSnippet(e.offsetX, e.offsetY);
+			}
+			else if (this.selectionMode)
+			{
+				this.drawSelection();
+				this.selector.startResize(e.offsetX, e.offsetY);
+			}
+			else
+			{
+				this.drawDot(e.offsetX, e.offsetY);
+			}
+		}
+
+		handleBrushMove(e)
+		{
+			if (e.buttons > 0 && this.selectionMode)
+			{
+				this.selector.resize(e.offsetX, e.offsetY);
+			}
+			else if (e.buttons > 0 && !this.snippetMode)
+			{
+				this.drawLine(e.offsetX, e.offsetY, e.movementX, e.movementY);
+			}
+		}
+
+		handleBrushUp()
+		{
+			if (this.selectionMode)
+			{
+				this.selector.copyCanvas(this.canvas);
+			}
+		}
+
+		drawSnippet(x, y)
+		{
+			this.selectedSnippet.draw(x, y);
+		}
+
+		drawDot(x, y)
+		{
+			this.ctx.beginPath();
+			this.ctx.arc(x, y, this.size / 2, 0, 2 * Math.PI);
+			this.ctx.fillStyle = this.color;
+			this.ctx.fill();
+		}
+
+		drawLine(x, y, dx, dy)
+		{
+			this.ctx.beginPath();
+			this.ctx.moveTo(x, y);
+			this.ctx.lineTo(x - dx, y - dy);
+			this.ctx.strokeStyle = this.color;
+			this.ctx.lineCap = "round";
+			this.ctx.lineWidth = this.size;
+			this.ctx.stroke();
+			this.ctx.closePath();
+		}
+
+		clearCanvas()
+		{
+			this.pushToHistory();
+			this.ctx.fillStyle = "#ffffff";
+			this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+			this.selector.clear();
+		}
+
+		disableAll()
+		{
+			document.querySelectorAll('.selected').forEach((selected) => {
+				selected.classList.remove('selected');
+			});
+			this.snippetMode = false;
+			this.selectionMode = false;
+			this.selector.clear()
+		}
+
+		pushToHistory()
+		{
+			this.history.push(this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height));
+		}
+
+		popFromHistory()
+		{
+			if (this.history.length > 0)
+			{
+				this.ctx.putImageData(this.history.pop(), 0, 0);
+			}
+		}
+
+		drawSelection()
+		{
+			this.selector.draw(this.canvas);
+		}
+
+		addSnippet(snippet)
+		{
+			snippet.draw(snippet.width / 2, snippet.height / 2, snippet.width, snippet.height);
+			const snippetData = this.ctx.getImageData(0, 0, snippet.width, snippet.height);
+
+			const canvas = document.createElement('canvas');
+			canvas.width = snippet.width;
+			canvas.height = snippet.height;
+			canvas.getContext('2d').putImageData(snippetData, 0, 0);
+			this.clearCanvas();
+
+			const img = new Image();
+			img.src = canvas.toDataURL();
+			img.className = 'snippet tool';
+			document.body.append(img);
+
+			img.addEventListener('click', () => {
+				setTimeout(() => {
+					this.snippetMode = snippet !== this.selectedSnippet;
+
+					if (this.snippetMode)
+					{
+						this.selectedSnippet = snippet;
+						img.classList.add('selected');
+					}
+					else
+					{
+						this.selectedSnippet = false;
+						img.classList.remove('selected');
+					}
+				}, 0);
+			});
+		}
+
+		snippets = [
+			{
+				height: 100,
+				width: 100,
+				draw: (x, y, width = 100, height = 100) => {
+					this.ctx.fillStyle = 'blue';
+					this.ctx.fillRect(x - width / 2, y - height / 2, width , height);
+
+					this.ctx.fillStyle = 'white';
+					this.ctx.beginPath();
+					this.ctx.arc(x, y, width / 2, 0, 2 * Math.PI);
+					this.ctx.fill();
+
+					this.ctx.fillStyle = 'blue';
+					this.ctx.fillRect(x - width / 2 + 15, y - height / 2 + 15, width - 30, height - 30);
+				}
+			},
+			{
+				height: 100,
+				width: 100,
+				draw: (x, y, width = 100, height = 100) => {
+					this.ctx.fillStyle = 'red';
+					this.ctx.beginPath();
+					this.ctx.arc(x, y - height / 3, width / 6, 0, 2 * Math.PI);
+					this.ctx.fill();
+
+					this.ctx.fillStyle = 'yellow';
+					this.ctx.beginPath();
+					this.ctx.arc(x, y, width / 6, 0, 2 * Math.PI);
+					this.ctx.fill();
+
+					this.ctx.fillStyle = 'lime';
+					this.ctx.beginPath();
+					this.ctx.arc(x, y + height / 3, width / 6, 0, 2 * Math.PI);
+					this.ctx.fill();
+				}
+			},
+			{
+				height: 100,
+				width: 100,
+				draw: (x, y, width = 100, height = 100) => {
+					this.ctx.fillStyle = 'red';
+					this.ctx.strokeStyle = 'red';
+					this.ctx.lineWidth = 4;
+
+					this.ctx.beginPath();
+					this.ctx.arc(x, y, width / 2 - 2, 0, 2 * Math.PI);
+					this.ctx.stroke();
+
+					this.ctx.fillRect(x - width / 8, y - height / 2 + 2, width / 4, height - 4);
+					this.ctx.fillRect(x - width / 2 + 2, y - height / 8, width - 4, height / 4);
+				}
+			}
+		]
+
+	}
+
+	const painter = new Painter(document.getElementById('painter'));
+	painter.setSize(600, 400);
+
+</script>
+
+</body>
+</html>
