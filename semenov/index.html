@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Лаба по фуану</title>
+</head>
+<body>
+
+<div class="container">
+	<h3 id="fuanTitle">Вычислитель заданий для лабораторной работы по фуану</h3>
+	<input type="text" id="secondName" placeholder="Введите Фамилию">
+	<input type="text" id="firstName" placeholder="Введите Полное Имя">
+	<div id="noThirdName" class="rainbow">Отчество не нужно</div>
+	<div id="tasks"></div>
+</div>
+
+<script>
+	const fuanTitle = document.getElementById('fuanTitle');
+	fuanTitle.addEventListener('click', () => {
+		if (fuanTitle.innerText === 'Вычислитель заданий для лабораторной работы по фуану')
+		{
+			fuanTitle.innerText = 'Вычислитель заданий для лабораторной работы по фуналу';
+			document.title = 'Лаба по фуналу';
+		}
+		else
+		{
+			fuanTitle.innerText = 'Вычислитель заданий для лабораторной работы по фуану';
+			document.title = 'Лаба по фуану';
+		}
+		setCookie('fuanTitle', fuanTitle.innerText, 100);
+		setCookie('fuan', document.title, 100);
+	});
+	const savedFuanTitle = getCookie('fuanTitle');
+	if (savedFuanTitle)
+	{
+		fuanTitle.innerText = savedFuanTitle;
+	}
+	const savedFuan = getCookie('fuan');
+	if (savedFuan)
+	{
+		document.title = savedFuan;
+	}
+
+	const noThirdName = document.getElementById('noThirdName');
+	noThirdName.addEventListener('click', () => {
+		if (noThirdName.className === 'rainbow')
+		{
+			noThirdName.className = 'none';
+		}
+		else
+		{
+			noThirdName.className = 'rainbow';
+		}
+		setCookie('rainbowClass', noThirdName.className, 100);
+	});
+	const savedRainbowClass = getCookie('rainbowClass');
+	if (savedRainbowClass)
+	{
+		noThirdName.className = savedRainbowClass;
+	}
+
+	const tasks = document.getElementById('tasks');
+	const firstNameInput = document.getElementById('firstName');
+	const secondNameInput = document.getElementById('secondName');
+
+	const savedFirstName = getCookie('firstName');
+	const savedSecondName = getCookie('secondName');
+	if (savedFirstName)
+	{
+		firstNameInput.value = savedFirstName;
+	}
+	if (savedSecondName)
+	{
+		secondNameInput.value = savedSecondName;
+	}
+	if (savedFirstName && savedSecondName)
+	{
+		updateTasks();
+	}
+
+	firstNameInput.addEventListener('input', () => {
+		setCookie('firstName', firstNameInput.value, 100);
+		updateTasks();
+	});
+	secondNameInput.addEventListener('input', () => {
+		setCookie('secondName', secondNameInput.value, 100);
+		updateTasks();
+	});
+
+	function updateTasks()
+	{
+		tasks.innerHTML = '';
+		const column = document.createElement('div');
+
+		const linearSystemTask = document.createElement('div');
+		linearSystemTask.innerHTML = `задание 16.${getLinearSystemTask()}`;
+		const linearSystemTaskImg1 = document.createElement('img');
+		linearSystemTaskImg1.src = './linearSystemTask1.jpg';
+		linearSystemTask.append(linearSystemTaskImg1);
+		const linearSystemTaskImg2 = document.createElement('img');
+		linearSystemTaskImg2.src = './linearSystemTask2.jpg';
+		linearSystemTask.append(linearSystemTaskImg2);
+
+		const functionalEquationTask = document.createElement('div');
+		functionalEquationTask.innerHTML = `задание 18.${getFunctionalEquationTask()}`;
+		const functionalEquationTaskImg = document.createElement('img');
+		functionalEquationTaskImg.src = './functionalEquationTask.jpg';
+		functionalEquationTask.append(functionalEquationTaskImg);
+
+		const integralEquationTask = document.createElement('div');
+		integralEquationTask.innerHTML = `задание 19.${getIntegralEquationTask()}`;
+		const integralEquationTaskImg = document.createElement('img');
+		integralEquationTaskImg.src = './integralEquationTask.jpg';
+		integralEquationTask.append(integralEquationTaskImg);
+
+		column.append(linearSystemTask, functionalEquationTask, integralEquationTask);
+		tasks.append(column);
+	}
+
+	function getFunctionalEquationTask()
+	{
+		const number = getSum() % 20;
+		return number === 0 ? 20 : number;
+	}
+
+	function getIntegralEquationTask()
+	{
+		const number = getSum() % 20;
+		return number === 0 ? 20 : number;
+	}
+
+	function getLinearSystemTask()
+	{
+		const number = getSum() % 18;
+		return number === 0 ? 18 : number;
+	}
+
+	function getSum()
+	{
+		const firstName = firstNameInput.value;
+		const secondName = secondNameInput.value;
+		const firstLetterNumber = getLetterNumber(secondName[0]);
+		return firstLetterNumber * 17 + firstName.length * 10;
+	}
+
+	function getLetterNumber(letter)
+	{
+		let index = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'.indexOf(letter);
+		if (index === -1)
+		{
+			index = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.indexOf(letter);
+		}
+		return index + 1;
+	}
+
+	function setCookie(name, value, days)
+	{
+		const date = new Date();
+		date.setTime(date.getTime() + (days*24*60*60*1000));
+		document.cookie = name + "=" + value +  "; expires=" + date.toUTCString() + "; path=/";
+	}
+
+	function getCookie(name)
+	{
+		const value = `; ${document.cookie}`;
+		const parts = value.split(`; ${name}=`);
+		if (parts.length === 2) return parts.pop().split(';').shift();
+	}
+
+</script>
+
+<style>
+	* {
+		margin: 0;
+	}
+	body {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		width: 100vw;
+		font-size: 14pt;
+	}
+	.row {
+		display: flex;
+		flex-wrap: wrap;
+	}
+	.row div {
+		flex: 1 1 12em;
+	}
+	.container {
+		margin: 15px;
+	}
+	img {
+		display: block;
+		flex: 1;
+		max-width: 90vw;
+	}
+	input {
+		margin-left: -5px;
+	}
+	#fuanTitle, #noThirdName {
+		cursor: pointer;
+		user-select: none;
+	}
+	#noThirdName {
+		display: inline-block;
+	}
+	.rainbow {
+		background: -webkit-linear-gradient(45deg, red, orange, yellow, green, lightblue, blue, blueviolet 80%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		animation: 3s infinite rotate linear;
+	}
+	@keyframes rotate {
+		from {
+			transform: rotateZ(0deg);
+		}
+		to {
+			transform: rotateZ(360deg);
+		}
+	}
+</style>
+
+</body>
+</html>
