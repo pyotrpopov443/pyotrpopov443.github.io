@@ -13,6 +13,7 @@
 <div style="margin: 5px">
 	<button id="brush" class="tool">кисть</button>
 	<button id="selection" class="tool">выделение</button>
+	<button id="curve" class="tool">кривая</button>
 	<button id="clear">очистить</button>
 </div>
 
@@ -43,6 +44,13 @@
 
 	.selected {
 		outline: 3px solid red;
+	}
+
+	.curve {
+		top: 8px;
+		left: 8px;
+		position: absolute;
+		pointer-events: none;
 	}
 </style>
 
@@ -201,10 +209,84 @@
 
 	}
 
+	class Curve {
+		size = 4;
+		color = '#000000';
+		curve = [];
+
+		constructor(canvas)
+		{
+			this.canvas = document.createElement('canvas');
+			this.canvas.width = canvas.width;
+			this.canvas.height = canvas.height;
+			this.ctx = this.canvas.getContext('2d');
+
+			this.img = new Image();
+			this.img.className = 'curve';
+			document.body.append(this.img);
+		}
+
+		draw()
+		{
+			this.ctx.fillStyle = "#ffffff";
+			this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+			this.ctx.strokeStyle = this.color;
+			this.ctx.lineCap = "round";
+			this.ctx.lineWidth = this.size;
+			this.ctx.beginPath();
+			this.ctx.moveTo(this.curve[0].x, this.curve[0].y);
+			for (let i = 0; i < this.curve.length - 1; i++) {
+				const p0 = (i > 0) ? this.curve[i - 1] : this.curve[0];
+				const p1 = this.curve[i];
+				const p2 = this.curve[i + 1];
+				const p3 = (i !== this.curve.length - 2) ? this.curve[i + 2] : p2;
+				const cp1x = p1.x + (p2.x - p0.x) / 6;
+				const cp1y = p1.y + (p2.y - p0.y) / 6;
+				const cp2x = p2.x - (p3.x - p1.x) / 6;
+				const cp2y = p2.y - (p3.y - p1.y) / 6;
+				this.ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+			}
+			this.ctx.stroke();
+		}
+
+		addPoint(x, y)
+		{
+			this.curve.push({x, y});
+			this.update();
+		}
+
+		update()
+		{
+			this.draw();
+			const curveData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+			const pix = curveData.data;
+			for (let i = 0; i < pix.length; i += 4)
+			{
+				if (pix[i] === 255 && pix[i + 1] === 255 && pix[i + 2] === 255)
+				{
+					pix[i + 3] = 0;
+				}
+			}
+
+			const canvas = document.createElement('canvas');
+			canvas.width = this.canvas.width;
+			canvas.height = this.canvas.height;
+			canvas.getContext('2d').putImageData(curveData, 0, 0);
+
+			this.img.src = canvas.toDataURL();
+		}
+
+		remove()
+		{
+			this.img.remove();
+		}
+	}
+
 	class Painter {
 		size = 4;
 		color = '#000000';
 		history = [];
+		curves = [];
 		snippetMode = false;
 		selectionMode = false;
 
@@ -216,6 +298,7 @@
 			this.history.push(this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height));
 			this.clearButton = document.getElementById('clear');
 			this.selectButton = document.getElementById('selection');
+			this.curveButton = document.getElementById('curve');
 
 			this.selector = new Selector();
 
@@ -252,6 +335,11 @@
 			this.selectButton.addEventListener('click', () => {
 				this.selectionMode = true;
 			});
+			this.curveButton.addEventListener('click', () => {
+				this.curveMode = true;
+				this.curve = new Curve(this.canvas);
+				this.curves.push(this.curve);
+			});
 		}
 
 		handleKeyDown(e)
@@ -266,7 +354,11 @@
 		handleBrushDown(e)
 		{
 			this.pushToHistory();
-			if (this.snippetMode)
+			if (this.curveMode)
+			{
+				this.addCurvePoint(e.offsetX, e.offsetY);
+			}
+			else if (this.snippetMode)
 			{
 				this.drawSnippet(e.offsetX, e.offsetY);
 			}
@@ -283,11 +375,15 @@
 
 		handleBrushMove(e)
 		{
-			if (e.buttons > 0 && this.selectionMode)
+			if (this.curveMode || this.snippetMode || e.buttons <= 0)
+			{
+				return;
+			}
+			if (this.selectionMode)
 			{
 				this.selector.resize(e.offsetX, e.offsetY);
 			}
-			else if (e.buttons > 0 && !this.snippetMode)
+			else
 			{
 				this.drawLine(e.offsetX, e.offsetY, e.movementX, e.movementY);
 			}
@@ -304,6 +400,11 @@
 		drawSnippet(x, y)
 		{
 			this.selectedSnippet.draw(x, y);
+		}
+
+		addCurvePoint(x, y)
+		{
+			this.curve.addPoint(x, y);
 		}
 
 		drawDot(x, y)
@@ -332,6 +433,12 @@
 			this.ctx.fillStyle = "#ffffff";
 			this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+			for (const curve of this.curves)
+			{
+				curve.remove();
+			}
+			this.curves = [];
+
 			this.selector.clear();
 		}
 
@@ -342,6 +449,7 @@
 			});
 			this.snippetMode = false;
 			this.selectionMode = false;
+			this.curveMode = false;
 			this.selector.clear()
 		}
 
