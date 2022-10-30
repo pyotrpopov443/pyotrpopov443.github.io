@@ -18,13 +18,6 @@
 </div>
 
 <script>
-	const glasniye = [...'иеееи'];
-	const link = document.getElementById('link');
-	setInterval(() => {
-		link.innerText = `Пр${glasniye[0]}м${glasniye[1]}р р${glasniye[2]}ш${glasniye[3]}н${glasniye[4]}я`;
-		glasniye.unshift(glasniye.pop());
-	}, 100);
-	
 	const fuanTitle = document.getElementById('fuanTitle');
 	fuanTitle.addEventListener('click', () => {
 		if (fuanTitle.innerText === 'Вычислитель заданий для лабораторной работы по фуану')
