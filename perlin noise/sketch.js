@@ -94,7 +94,7 @@ function mouseWheel(event)
 {
     randomArray = [];
     noiseArray = [];
-    scroll += event.delta/100;
+    scroll += (event.deltaX + event.deltaY)/100;
     for (let i = 0; i < count; i++)
     {
         randomArray.push(random(-height/2 + height/7, -height/7));
