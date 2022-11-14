@@ -15,6 +15,7 @@
 	<button id="selection" class="tool">выделение</button>
 	<button id="curve" class="tool">кривая</button>
 	<button id="clear">очистить</button>
+	Интерполяция: <button id="linear_interpolation">линейная</button><button id="step_interpolation">ступенчатая</button>
 </div>
 
 <style>
@@ -24,6 +25,7 @@
 	#painter {
 		box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.2);
 	}
+
 	#selector {
 		position: absolute;
 		z-index: 1;
@@ -240,10 +242,10 @@
 				const p1 = this.curve[i];
 				const p2 = this.curve[i + 1];
 				const p3 = (i !== this.curve.length - 2) ? this.curve[i + 2] : p2;
-				const cp1x = p1.x + (p2.x - p0.x) / 6;
-				const cp1y = p1.y + (p2.y - p0.y) / 6;
-				const cp2x = p2.x - (p3.x - p1.x) / 6;
-				const cp2y = p2.y - (p3.y - p1.y) / 6;
+				const cp1x = p1.x + (p2.x - p0.x) / 3;
+				const cp1y = p1.y + (p2.y - p0.y) / 3;
+				const cp2x = p2.x - (p3.x - p1.x) / 3;
+				const cp2y = p2.y - (p3.y - p1.y) / 3;
 				this.ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
 			}
 			this.ctx.stroke();
@@ -299,6 +301,8 @@
 			this.clearButton = document.getElementById('clear');
 			this.selectButton = document.getElementById('selection');
 			this.curveButton = document.getElementById('curve');
+			this.linearInterpolationButton = document.getElementById('linear_interpolation');
+			this.stepInterpolationButton = document.getElementById('step_interpolation');
 
 			this.selector = new Selector();
 
@@ -329,7 +333,9 @@
 			this.canvas.addEventListener('mousemove', this.handleBrushMove.bind(this));
 			this.canvas.addEventListener('mouseup', this.handleBrushUp.bind(this));
 			this.canvas.addEventListener('keydown', this.handleKeyDown.bind(this));
+			this.canvas.addEventListener('keyup', this.handleKeyUp.bind(this));
 			document.addEventListener('keydown', this.handleKeyDown.bind(this));
+			document.addEventListener('keyup', this.handleKeyUp.bind(this));
 
 			this.clearButton.addEventListener('click', this.clearCanvas.bind(this));
 			this.selectButton.addEventListener('click', () => {
@@ -340,10 +346,60 @@
 				this.curve = new Curve(this.canvas);
 				this.curves.push(this.curve);
 			});
+
+			this.canvas.addEventListener('drop', this.handleImageDrop.bind(this));
+			this.canvas.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+			this.linearInterpolationButton.addEventListener('click', () => { this.setLinearInterpolation() });
+			this.stepInterpolationButton.addEventListener('click', () => { this.setStepInterpolation() });
+		}
+
+		handleImageDrop(e) {
+			e.preventDefault();
+			const file = this.getFile(e);
+			this.renderFile(file, e.offsetX, e.offsetY);
+		}
+
+		getFile(e)
+		{
+			if (e.dataTransfer.items)
+			{
+				for (const item of e.dataTransfer.items)
+				{
+					if (item.kind === 'file')
+					{
+						return item.getAsFile();
+					}
+				}
+			}
+			return e.dataTransfer.files[0];
+		}
+
+		renderFile(file, x, y)
+		{
+			const img = new Image();
+			img.src = URL.createObjectURL(file);
+			img.onload = () => {
+				this.ctx.drawImage(img, x, y, img.width, img.height);
+			};
+		}
+
+		setStepInterpolation()
+		{
+			this.canvas.style.imageRendering = 'pixelated';
+		}
+
+		setLinearInterpolation()
+		{
+			this.canvas.style.imageRendering = '';
 		}
 
 		handleKeyDown(e)
 		{
+			if (e.shiftKey)
+			{
+				this.shift = true;
+			}
 			const isCtrlZ = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z');
 			if (isCtrlZ)
 			{
@@ -351,9 +407,21 @@
 			}
 		}
 
+		handleKeyUp()
+		{
+			this.shift = false;
+		}
+
 		handleBrushDown(e)
 		{
 			this.pushToHistory();
+
+			if (this.shift)
+			{
+				this.performFill(e.offsetX, e.offsetY);
+				return;
+			}
+
 			if (this.curveMode)
 			{
 				this.addCurvePoint(e.offsetX, e.offsetY);
@@ -425,6 +493,102 @@
 			this.ctx.lineWidth = this.size;
 			this.ctx.stroke();
 			this.ctx.closePath();
+		}
+
+		performFill(x, y)
+		{
+			floodFill(this.ctx, x, y, 0xFF0000FF);
+
+			function getPixel(pixelData, x, y) {
+				if (x < 0 || y < 0 || x >= pixelData.width || y >= pixelData.height) {
+					return -1;
+				} else {
+					return pixelData.data[y * pixelData.width + x];
+				}
+			}
+
+			function floodFill(ctx, x, y, fillColor) {
+				const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+				const pixelData = {
+					width: imageData.width,
+					height: imageData.height,
+					data: new Uint32Array(imageData.data.buffer),
+				};
+				const targetColor = getPixel(pixelData, x, y);
+				if (targetColor !== fillColor) {
+					const spansToCheck = [];
+
+					function addSpan(left, right, y, direction) {
+						spansToCheck.push({left, right, y, direction});
+					}
+
+					function checkSpan(left, right, y, direction) {
+						let inSpan = false;
+						let start;
+						let x;
+						for (x = left; x < right; ++x) {
+							const color = getPixel(pixelData, x, y);
+							if (color === targetColor) {
+								if (!inSpan) {
+									inSpan = true;
+									start = x;
+								}
+							} else {
+								if (inSpan) {
+									inSpan = false;
+									addSpan(start, x - 1, y, direction);
+								}
+							}
+						}
+						if (inSpan) {
+							inSpan = false;
+							addSpan(start, x - 1, y, direction);
+						}
+					}
+
+					addSpan(x, x, y, 0);
+
+					while (spansToCheck.length > 0) {
+						const {left, right, y, direction} = spansToCheck.pop();
+						let l = left;
+						for (;;) {
+							--l;
+							const color = getPixel(pixelData, l, y);
+							if (color !== targetColor) {
+								break;
+							}
+						}
+						++l
+
+						let r = right;
+						for (;;) {
+							++r;
+							const color = getPixel(pixelData, r, y);
+							if (color !== targetColor) {
+								break;
+							}
+						}
+
+						const lineOffset = y * pixelData.width;
+						pixelData.data.fill(3925868544, lineOffset + l, lineOffset + r);
+
+						if (direction <= 0) {
+							checkSpan(l, r, y - 1, -1);
+						} else {
+							checkSpan(l, left, y - 1, -1);
+							checkSpan(right, r, y - 1, -1);
+						}
+
+						if (direction >= 0) {
+							checkSpan(l, r, y + 1, +1);
+						} else {
+							checkSpan(l, left, y + 1, +1);
+							checkSpan(right, r, y + 1, +1);
+						}
+					}
+					ctx.putImageData(imageData, 0, 0);
+				}
+			}
 		}
 
 		clearCanvas()
