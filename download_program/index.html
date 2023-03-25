@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Установить Экологические договоры в Российской Федерации</title>
+</head>
+<body>
+  <div>После нажатия на кнопку "Скачать" начнётся скачивание установочного файла образовательной программы</div>
+  </br>
+  <button id="download_file">Скачать</button>
+  <script>
+    const downloadFileButton = document.querySelector('button#download_file');
+    const download = document.createElement('a');
+    download.href = 'data:text/plain;charset=utf-8, ' + encodeURIComponent('123');
+    download.download = "Установить Экологические договоры в Российской Федерации.txt";
+    download.click();
+  </script>
+</body>
+</html>
