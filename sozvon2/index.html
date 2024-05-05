@@ -494,7 +494,7 @@ function softBodyFromPoints(points, size, position, color) {
 
     let gravitySensor = new GravitySensor({ frequency: 60 });
     gravitySensor.addEventListener('reading', () => {
-        gravity = new Vector(gravitySensor.x, gravitySensor.y);
+        gravity = new Vector(-gravitySensor.x, gravitySensor.y);
         gravity.setMag(1);
     });
     gravitySensor.start();
