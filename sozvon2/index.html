@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>SoftBody</title>
+	<style>
+
+* {margin: 0;}
+
+.container {
+	position: absolute;
+	width: 100svw;
+	height: 100svh;
+}
+
+canvas {
+	position: absolute;
+}
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+	<canvas id="canvas"></canvas>
+</div>
+
+<script>
+function map(x, inputFrom, inputTo, outputFrom, outputTo) {
+    return outputFrom + ((outputTo - outputFrom) / (inputTo - inputFrom)) * (x - inputFrom);
+}
+
+function constrain(value, lowerBound, upperBound) {
+    if (value < lowerBound) return lowerBound;
+    if (value > upperBound) return upperBound;
+    return value;
+}
+
+function Vector(x = 0, y = 0, z = 0) {
+	this.x = x;
+	this.y = y;
+	this.z = z;
+	return this;
+}
+Vector.prototype.add = function(vector) {
+	this.x += vector.x;
+	this.y += vector.y;
+	this.z += vector.z;
+	return this;
+}
+Vector.prototype.sub = function(vector) {
+	this.x -= vector.x;
+	this.y -= vector.y;
+	this.z -= vector.z;
+	return this;
+}
+Vector.prototype.mult = function(lambda) {
+	this.x *= lambda;
+	this.y *= lambda;
+	this.z *= lambda;
+	return this;
+}
+Vector.prototype.dot = function(vector) {
+	return this.x * vector.x + this.y * vector.y + this.z * vector.z;
+}
+Vector.prototype.cross = function(vector) {
+	const a1 = this.x;
+	const a2 = this.y;
+	const a3 = this.z;
+	const b1 = vector.x;
+	const b2 = vector.y;
+	const b3 = vector.z;
+
+	this.x *= a2 * b3 - a3 * b2;
+	this.y *= a1 * b3 - a3 * b1;
+	this.z *= a1 * b2 - a2 * b1;
+	return this;
+}
+Vector.prototype.div = function(lambda) {
+	if (lambda === 0) return this;
+	this.x /= lambda;
+	this.y /= lambda;
+	this.z /= lambda;
+	return this;
+}
+Vector.prototype.rotate = function(angle) {
+	const x1 = this.x;
+	const y1 = this.y;
+	this.x = x1 * Math.cos(angle) - y1 * Math.sin(angle);
+	this.y = x1 * Math.sin(angle) + y1 * Math.cos(angle);
+	return this;
+}
+Vector.prototype.mag = function() {
+	return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+}
+Vector.prototype.setMag = function(newMag) {
+	let curMag = this.mag();
+	if (curMag === 0) return this;
+	this.x *= newMag / curMag;
+	this.y *= newMag / curMag;
+	this.z *= newMag / curMag;
+	return this;
+}
+Vector.prototype.normalize = function() {
+	return this.setMag(1);
+}
+Vector.prototype.limit = function(maxMag) {
+	if (this.mag() > maxMag) {
+		this.setMag(maxMag);
+	}
+	return this;
+}
+function vecAdd(vector1, vector2) {
+	return new Vector(vector1.x + vector2.x, vector1.y + vector2.y, vector1.z + vector2.z);
+}
+function vecSub(vector1, vector2) {
+	return new Vector(vector1.x - vector2.x, vector1.y - vector2.y, vector1.z - vector2.z);
+}
+function vecMult(vector, lambda) {
+	return new Vector(vector.x * lambda, vector.y * lambda, vector.z * lambda);
+}
+function vecCross(vector1, vector2) {
+	const a1 = vector1.x;
+	const a2 = vector1.y;
+	const a3 = vector1.z;
+	const b1 = vector2.x;
+	const b2 = vector2.y;
+	const b3 = vector2.z;
+	return new Vector(a2 * b3 - a3 * b2, a1 * b3 - a3 * b1, a1 * b2 - a2 * b1);
+}
+function distance(vector1, vector2) {
+	return vecSub(vector1, vector2).mag();
+}
+
+/*==========================
+Spring
+==========================*/
+function Spring(length, stiffness, index) {
+	this.length = length;
+	this.stiffness = stiffness;
+	this.index = index;
+}
+
+/*==========================
+SoftBodyNode
+==========================*/
+function SoftBodyNode(position, damping, springs) {
+	this.position = new Vector(position.x, position.y);
+	this.damping = damping;
+	this.springs = springs;
+	this.velocity = new Vector();
+	this.globalVelocity = new Vector();
+}
+SoftBodyNode.prototype.integrateSprings = function(nodes) {
+	for (const spring of this.springs) {
+		const node = nodes[spring.index];
+		const desiredPosition = vecSub(this.position, node.position);
+		desiredPosition.setMag(spring.length);
+		desiredPosition.add(node.position);
+		const desired = vecSub(desiredPosition, this.position);
+		desired.mult(spring.stiffness);
+		this.velocity.add(desired);
+	}
+}
+SoftBodyNode.prototype.calculateGlobal = function(softBody) {
+	const pos = vecSub(this.position, softBody.position);
+	const nodeAngularVelocity = new Vector(pos.x, pos.y).rotate(softBody.angularVelocity.z * Math.PI/180);
+	nodeAngularVelocity.sub(pos);
+	nodeAngularVelocity.div(softBody.averageDistance);
+	this.globalVelocity = vecAdd(softBody.linearVelocity, nodeAngularVelocity);
+}
+SoftBodyNode.prototype.applyDamping = function() {
+	this.velocity.sub(this.globalVelocity);
+	this.velocity.mult(1 - this.damping);
+	this.velocity.add(this.globalVelocity);
+}
+SoftBodyNode.prototype.integrateExternal = function(softBodyExternalForce) {
+	this.velocity.add(softBodyExternalForce);
+}
+SoftBodyNode.prototype.update = function() {
+	this.position.add(this.velocity);
+}
+SoftBodyNode.prototype.boundaryCollide = function(boundaryFriction) {
+	if (this.position.x < 0 || this.position.x > canvas.width) {
+		this.velocity.x *= -1;
+		this.velocity.mult(1 - boundaryFriction);
+	}
+	if (this.position.y < 0 || this.position.y > canvas.height) {
+		this.velocity.y *= -1;
+		this.velocity.mult(1 - boundaryFriction);
+	}
+	this.position.x = constrain(this.position.x, 0, canvas.width);
+	this.position.y = constrain(this.position.y, 0, canvas.height);
+}
+SoftBodyNode.prototype.collide = function(softBody, normal, damping, force, insideOut) {
+	let scalar = softBody.getPushingOutForce(this.position, insideOut);
+	if (scalar < 0) {
+		this.velocity.sub(this.globalVelocity);
+		this.velocity.sub(vecMult(normal, force * -scalar));
+		this.velocity.mult(1 - damping * 0.85);
+		this.velocity.add(this.globalVelocity);
+	}
+}
+
+/*==========================
+SoftBody
+==========================*/
+function SoftBody(nodes, color) {
+	this.nodes = nodes;
+	this.color = color;
+	this.isDrag = false;
+	this.resetAttributes();
+	this.center = this.getCenter();
+	this.initialAngleSum = this.getAngleSum();
+}
+SoftBody.prototype.resetAttributes = function() {
+	this.angularVelocity = new Vector();
+	this.linearVelocity = new Vector();
+	this.position = new Vector();
+	this.externalForce = new Vector();
+	this.averageDistance = 0;
+	this.radii = new Array(this.nodes.length);
+	this.normals = new Array(this.nodes.length);
+}
+SoftBody.prototype.calculateAttributes = function() {
+	for (const node of this.nodes) {
+		this.linearVelocity.add(node.velocity);
+		this.position.add(node.position);
+	}
+	this.linearVelocity.div(this.nodes.length);
+	this.position.div(this.nodes.length);
+
+	for (const node of this.nodes) {
+		this.averageDistance += distance(node.position, this.position);
+		const nodeAngularVelocity = vecSub(node.position, this.position);
+		this.angularVelocity.add(vecCross(nodeAngularVelocity, node.velocity));
+	}
+	this.angularVelocity.div(this.nodes.length)
+	this.averageDistance /= this.nodes.length;
+
+	this.center = this.getCenter();
+}
+SoftBody.prototype.getCenter = function() {
+	const sum = new Vector(0, 0);
+	for (const node of this.nodes) {
+		sum.add(node.position);
+	}
+	return sum.div(this.nodes.length);
+}
+SoftBody.prototype.calculateSurface = function() {
+	let l = this.nodes.length;
+	for (let i = 0; i < l; i++) {
+		const prev = this.nodes[(i - 1) - l * Math.floor((i - 1) / l)].position;
+		const curr = this.nodes[i].position;
+		const next = this.nodes[(i + 1) % l].position;
+		const normal = vecSub(prev, curr).rotate(Math.PI/2).normalize();
+		normal.add(vecSub(curr, next).rotate(Math.PI/2).normalize())
+		this.normals[i] = normal.normalize();
+		this.radii[i] = distance(curr, this.position);
+	}
+}
+SoftBody.prototype.getAngleSum = function () {
+	let angleSum = 0;
+	let previousNode = vecSub(this.nodes[0].position, this.center);
+	for (let node of this.nodes) {
+		const centeredNode = vecSub(node.position, this.center);
+		const nodeAngle = Math.atan2(centeredNode.y, centeredNode.x);
+		const previousNodeAngle = Math.atan2(previousNode.y, previousNode.x);
+		const diff = nodeAngle - previousNodeAngle;
+		if (Math.abs(diff) < Math.PI) {
+			angleSum += diff;
+		}
+		previousNode = centeredNode;
+	}
+	return angleSum;
+}
+SoftBody.prototype.getPushingOutForce = function(point, insideOut) {
+	let hrbf = 0;
+	for (let i = 0; i < this.nodes.length; i++) {
+		const position = this.nodes[i].position;
+		const radius = this.radii[i];
+		const normal = this.normals[i];
+		const d = distance(point, position);
+		const d_scl = d / radius;
+		if (0 <= d_scl && d_scl <= 1) {
+			const r_sqr = radius * radius;
+			const v1 = vecMult(normal, r_sqr / (20 + r_sqr));
+			const v2 = vecSub(point, position);
+			v2.mult(20 * Math.pow(d - radius, 3) / Math.pow(radius, 5));
+			hrbf -= v1.dot(v2);
+		}
+	}
+	return hrbf;
+}
+SoftBody.prototype.display = function() {
+	fill(this.color);
+	ctx.beginPath();
+	ctx.moveTo(this.nodes[0].position.x, this.nodes[0].position.y);
+	for (let i = 0; i < this.nodes.length - 1; i++) {
+		const p0 = (i > 0) ? this.nodes[i - 1].position : this.nodes[0].position;
+		const p1 = this.nodes[i].position;
+		const p2 = this.nodes[i + 1].position;
+		const p3 = (i !== this.nodes.length - 2) ? this.nodes[i + 2].position : p2;
+		const cp1x = p1.x + (p2.x - p0.x) / 6;
+		const cp1y = p1.y + (p2.y - p0.y) / 6;
+		const cp2x = p2.x - (p3.x - p1.x) / 6;
+		const cp2y = p2.y - (p3.y - p1.y) / 6;
+		ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+	}
+	ctx.lineTo(this.nodes[0].position.x, this.nodes[0].position.y);
+	ctx.fill();
+}
+SoftBody.prototype.integrateForces = function() {
+	for (const node of this.nodes) {
+		node.integrateExternal(this.externalForce);
+		node.integrateSprings(this.nodes);
+	}
+}
+SoftBody.prototype.intersects = function(point) {
+	let isCollision = false;
+	for (let i = 0; i < this.nodes.length; i++) {
+		const current = this.nodes[i].position;
+		const next = this.nodes[(i + 1) % this.nodes.length].position;
+		if (((current.y >= point.y && next.y < point.y) || (current.y < point.y && next.y >= point.y)) &&
+			(point.x < (next.x - current.x) * (point.y - current.y) / (next.y - current.y) + current.x)) {
+			isCollision = !isCollision;
+		}
+	}
+	return isCollision;
+}
+SoftBody.prototype.insideOut = function () {
+	return this.getAngleSum() * this.initialAngleSum < 0;
+}
+SoftBody.prototype.drag = function(mouse) {
+	if (mousePressed && this.intersects(mouse)) {
+		this.isDrag = true;
+	}
+	if (!mousePressed) {
+		this.isDrag = false;
+	}
+}
+SoftBody.prototype.applyMouseForce = function(mouse) {
+	if (this.isDrag) {
+		const desired = vecSub(mouse, this.getCenter());
+		const d = desired.mag();
+		const maxSpeed = 70;
+		let speed = maxSpeed;
+		if (d < 100) {
+			speed = map(d, 0, 100, 0, maxSpeed);
+		}
+		desired.setMag(speed);
+		for (const node of this.nodes) {
+			let steer = vecSub(desired, node.velocity);
+			steer.limit(maxSpeed);
+			node.velocity.add(steer);
+		}
+	}
+}
+SoftBody.prototype.applyFriction = function(boundaryFriction) {
+	for (const node of this.nodes) {
+		node.calculateGlobal(this)
+		node.applyDamping();
+		node.update();
+		node.boundaryCollide(boundaryFriction);
+	}
+}
+SoftBody.prototype.collide = function(softBody, damping, force) {
+	for (let i = 0; i < this.nodes.length; i++) {
+		this.nodes[i].collide(softBody, this.normals[i], damping, force, this.insideOut());
+	}
+}
+
+/*==========================
+SoftBodyScene
+==========================*/
+function SoftBodyScene(softBodies, forces) {
+	this.softBodies = softBodies;
+	this.boundaryFriction = 0.6;
+	this.collisonDamping = 0.7;
+	this.collisionForce = 500;
+	this.forces = forces;
+	this.isDrag = false;
+}
+SoftBodyScene.prototype.drag = function(softBody) {
+	const mouse = new Vector(mouseX, mouseY);
+	if (!this.isDrag) {
+		softBody.drag(mouse);
+		this.isDrag = softBody.isDrag;
+	}
+	if (!mousePressed) {
+		this.isDrag = false;
+	}
+	softBody.applyMouseForce(mouse);
+}
+SoftBodyScene.prototype.update = function() {
+	for (const softBody of this.softBodies) {
+		for (const force of this.forces) {
+			softBody.externalForce.add(force(softBody))
+		}
+		this.drag(softBody);
+		softBody.integrateForces();
+		softBody.resetAttributes();
+		softBody.calculateAttributes();
+		softBody.calculateSurface();
+		softBody.applyFriction(this.boundaryFriction);
+		for (const sceneSoftBody of this.softBodies) {
+			if (softBody !== sceneSoftBody) {
+				softBody.collide(sceneSoftBody, this.collisonDamping, this.collisionForce);
+			}
+		}
+		softBody.display();
+	}
+}
+
+/*==========================
+functions
+==========================*/
+function softBodyFromPoints(points, size, position, color) {
+	const damping = 0.7;
+	const stiffness = 0.06;
+
+	let nodes = [];
+	for (let i = 0; i < points.length; i++) {
+		const springs = [];
+		for (let j = 0; j < points.length; j++) {
+			if (i !== j) {
+				springs.push(new Spring(0, stiffness, j));
+			}
+		}
+		nodes[i] = new SoftBodyNode(vecAdd(points[i], position), damping, springs);
+	}
+	for (const node of nodes) {
+		for (const spring of node.springs) {
+			let d = distance(node.position, nodes[spring.index].position);
+			spring.length = d;
+			spring.stiffness *= Math.sqrt(2) * size/d;
+		}
+	}
+	return new SoftBody(nodes, color);
+}
+</script>
+
+<script>
+	const backgroundColor = '#f6f6f6';
+
+	const p = [
+		new Vector(-50, -50),new Vector(-40, -50),new Vector(-30, -50),new Vector(-20, -50),new Vector(-10, -50),new Vector(0, -50),new Vector(10, -50),new Vector(20, -50),new Vector(30, -50),new Vector(40, -50),
+		new Vector(50, -50),new Vector(50, -40),new Vector(50, -30),new Vector(50, -20),new Vector(50, -10),new Vector(50, 0),new Vector(50, 10),new Vector(50, 20),new Vector(50, 30),new Vector(50, 40),new Vector(50, 50),new Vector(50, 60),new Vector(50, 70),
+		new Vector(50, 80),new Vector(40, 80),new Vector(30, 80),new Vector(20, 80),new Vector(10, 80),new Vector(0, 80),new Vector(-10, 80),new Vector(-20, 80),new Vector(-30, 80),new Vector(-40, 80),
+		new Vector(-50, 80),new Vector(-50, 70),new Vector(-50, 60),new Vector(-50, 50),new Vector(-50, 40),new Vector(-50, 30),new Vector(-50, 20),new Vector(-50, 10),new Vector(-50, 0),new Vector(-50, -10),new Vector(-50, -20),new Vector(-50, -30),new Vector(-50, -40),
+	];
+	const t = [
+		new Vector(-50, -50),new Vector(-40, -50),new Vector(-30, -50),new Vector(-20, -50),new Vector(-10, -50),new Vector(0, -50),new Vector(10, -50),new Vector(20, -50),new Vector(30, -50),new Vector(40, -50),
+		new Vector(50, -10),new Vector(40, -10),new Vector(30, -10),
+		new Vector(20, -10),new Vector(20, 0),new Vector(20, 10),new Vector(20, 20),new Vector(20, 30),new Vector(20, 40),new Vector(20, 50),new Vector(20, 60),new Vector(20, 70),
+		new Vector(20, 80),new Vector(10, 80),new Vector(0, 80),new Vector(-10, 80),
+		new Vector(-20, 80),new Vector(-20, 70),new Vector(-20, 60),new Vector(-20, 50),new Vector(-20, 40),new Vector(-20, 30),new Vector(-20, 20),new Vector(-20, 10),new Vector(-20, 0),
+		new Vector(-20, -10),new Vector(-30, -10),new Vector(-40, -10),
+		new Vector(-50, -10),new Vector(-50, -20),new Vector(-50, -30),new Vector(-50, -40),
+	];
+	const eight = [
+		new Vector(-26, -6),
+		new Vector(-38, -17),
+		new Vector(-44, -32),
+		new Vector(-41, -48),
+		new Vector(-32, -62),
+		new Vector(-18, -70),
+		new Vector(0, -73),
+		new Vector(16, -71),
+		new Vector(31, -65),
+		new Vector(42, -53),
+		new Vector(45, -37),
+		new Vector(42, -21),
+		new Vector(31, -8),
+		new Vector(42, 4),
+		new Vector(48, 19),
+		new Vector(50, 35),
+		new Vector(45, 51),
+		new Vector(33, 64),
+		new Vector(18, 71),
+		new Vector(-5, 74),
+		new Vector(-21, 71),
+		new Vector(-35, 63),
+		new Vector(-43, 49),
+		new Vector(-49, 34),
+		new Vector(-47, 18),
+		new Vector(-39, 4),
+	];
+
+	let scene404;
+	let gravity = new Vector(0, 1);
+
+    let gravitySensor = new GravitySensor({ frequency: 60 });
+    gravitySensor.addEventListener('reading', () => {
+        gravity = new Vector(gravitySensor.x, gravitySensor.y);
+        gravity.setMag(1);
+    });
+    gravitySensor.start();
+
+	function setup() {
+		const pos1 = new Vector(2*canvas.width/6, canvas.height/2);
+		const pos2 = new Vector(3*canvas.width/6, canvas.height/2);
+		const pos3 = new Vector(4*canvas.width/6, canvas.height/2);
+
+		let softBodies = [
+			softBodyFromPoints(p, 100, pos1, '#8ad196'),
+			softBodyFromPoints(t, 100, pos2, '#91bcbc'),
+			softBodyFromPoints(eight, 100, pos3, '#98a6e1')
+		];
+
+		console.log(softBodies);
+
+		const gravity_force = function(softBody) {
+			softBody.externalForce.add(gravity);
+			return softBody.externalForce;
+		}
+
+		const forces = [gravity_force];
+		scene404 = new SoftBodyScene(softBodies, forces);
+	}
+
+	function draw() {
+		background(backgroundColor);
+		scene404.update();
+	}
+
+</script>
+<script>
+//canvas
+const canvas = document.getElementById('canvas');
+canvas.height = canvas.parentElement.getBoundingClientRect().height;
+canvas.width = canvas.parentElement.getBoundingClientRect().width;
+const ctx = canvas.getContext('2d');
+ctx.textBaseline = "middle";
+ctx.textAlign = "center";
+
+//variables
+let mouseX = 0;
+let mouseY = 0;
+let mousePressed = false;
+
+//loop
+setup();
+draw();
+setInterval(draw, 17);
+
+//functions
+function background(color) {
+	fill(color);
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function stroke(color) {
+	ctx.strokeStyle = color;
+}
+
+function fill(color) {
+	ctx.fillStyle = color;
+}
+
+function font(options) {
+	ctx.font = options;
+}
+
+function circle(x, y, radius) {
+	ctx.beginPath();
+	ctx.arc(x, y, radius, 0, 2 * Math.PI, true)
+	ctx.fill();
+	ctx.closePath();
+}
+
+//event listeners
+window.addEventListener('mousemove', e => {
+	mouseX = e.clientX - canvas.getBoundingClientRect().x;
+	mouseY = e.clientY - canvas.getBoundingClientRect().y;
+});
+window.addEventListener('touchmove', e => {
+	mouseX = e.touches[0].clientX - canvas.getBoundingClientRect().x;
+	mouseY = e.touches[0].clientY - canvas.getBoundingClientRect().y;
+});
+
+window.addEventListener('mousedown', e => {
+	if (e.button === 0) mousePressed = true;
+});
+window.addEventListener('touchstart', () => {
+	mousePressed = true;
+});
+window.addEventListener('mouseup', e => {
+	if (e.button === 0) mousePressed = false;
+});
+window.addEventListener('touchend', () => {
+	mousePressed = false;
+});
+
+window.addEventListener('resize', () => {
+	canvas.height = canvas.parentElement.getBoundingClientRect().height;
+	canvas.width = canvas.parentElement.getBoundingClientRect().width;
+	draw();
+});
+</script>
+
+</body>
+</html>
