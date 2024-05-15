@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Sozvon42</title>
+	<style>
+		* {margin: 0;}
+
+		.container {
+			position: absolute;
+			width: 100svw;
+			height: 100svh;
+		}
+
+		canvas {
+			position: absolute;
+		}
+	</style>
+</head>
+<body>
+
+<div class="container">
+	<canvas id="canvas" height="704" width="960"></canvas>
+</div>
+
+<script>
+function map(x, inputFrom, inputTo, outputFrom, outputTo) {
+	return outputFrom + ((outputTo - outputFrom) / (inputTo - inputFrom)) * (x - inputFrom);
+}
+
+function constrain(value, lowerBound, upperBound) {
+	if (value < lowerBound) return lowerBound;
+	if (value > upperBound) return upperBound;
+	return value;
+}
+
+function Vector(x = 0, y = 0, z = 0) {
+	this.x = x;
+	this.y = y;
+	this.z = z;
+	return this;
+}
+Vector.prototype.add = function(vector) {
+	this.x += vector.x;
+	this.y += vector.y;
+	this.z += vector.z;
+	return this;
+}
+Vector.prototype.sub = function(vector) {
+	this.x -= vector.x;
+	this.y -= vector.y;
+	this.z -= vector.z;
+	return this;
+}
+Vector.prototype.mult = function(lambda) {
+	this.x *= lambda;
+	this.y *= lambda;
+	this.z *= lambda;
+	return this;
+}
+Vector.prototype.dot = function(vector) {
+	return this.x * vector.x + this.y * vector.y + this.z * vector.z;
+}
+Vector.prototype.cross = function(vector) {
+	const a1 = this.x;
+	const a2 = this.y;
+	const a3 = this.z;
+	const b1 = vector.x;
+	const b2 = vector.y;
+	const b3 = vector.z;
+
+	this.x *= a2 * b3 - a3 * b2;
+	this.y *= a1 * b3 - a3 * b1;
+	this.z *= a1 * b2 - a2 * b1;
+	return this;
+}
+Vector.prototype.div = function(lambda) {
+	if (lambda === 0) return this;
+	this.x /= lambda;
+	this.y /= lambda;
+	this.z /= lambda;
+	return this;
+}
+Vector.prototype.rotate = function(angle) {
+	const x1 = this.x;
+	const y1 = this.y;
+	this.x = x1 * Math.cos(angle) - y1 * Math.sin(angle);
+	this.y = x1 * Math.sin(angle) + y1 * Math.cos(angle);
+	return this;
+}
+Vector.prototype.mag = function() {
+	return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+}
+Vector.prototype.setMag = function(newMag) {
+	let curMag = this.mag();
+	if (curMag === 0) return this;
+	this.x *= newMag / curMag;
+	this.y *= newMag / curMag;
+	this.z *= newMag / curMag;
+	return this;
+}
+Vector.prototype.normalize = function() {
+	return this.setMag(1);
+}
+Vector.prototype.limit = function(maxMag) {
+	if (this.mag() > maxMag) {
+		this.setMag(maxMag);
+	}
+	return this;
+}
+function vecAdd(vector1, vector2) {
+	return new Vector(vector1.x + vector2.x, vector1.y + vector2.y, vector1.z + vector2.z);
+}
+function vecSub(vector1, vector2) {
+	return new Vector(vector1.x - vector2.x, vector1.y - vector2.y, vector1.z - vector2.z);
+}
+function vecMult(vector, lambda) {
+	return new Vector(vector.x * lambda, vector.y * lambda, vector.z * lambda);
+}
+function vecCross(vector1, vector2) {
+	const a1 = vector1.x;
+	const a2 = vector1.y;
+	const a3 = vector1.z;
+	const b1 = vector2.x;
+	const b2 = vector2.y;
+	const b3 = vector2.z;
+	return new Vector(a2 * b3 - a3 * b2, a1 * b3 - a3 * b1, a1 * b2 - a2 * b1);
+}
+function distance(vector1, vector2) {
+	return vecSub(vector1, vector2).mag();
+}
+</script>
+
+<script>
+	const fps = 20;
+	const backgroundColor = '#f6f6f6';
+	const columns = 20;
+	const cellWidth = Math.floor(window.innerWidth / columns);
+	const rows = Math.floor(window.innerHeight / cellWidth);
+
+	const canvasBoard = Array(rows).fill().map((_, y) => Array(columns).fill().map((_, x) => ({x, y})));
+	const secretBoard = Array(rows).fill().map((_, y) => Array(columns).fill().map((_, x) => ({x, y})));
+	const secretCells = [{x: 2, y: 0},{x: 3, y: 0},{x: 4, y: 0},{x: 6, y: 0},{x: 7, y: 0},{x: 8, y: 0},{x: 10, y: 0},{x: 11, y: 0},{x: 12, y: 0},{x: 2, y: 1},{x: 4, y: 1},{x: 7, y: 1},{x: 10, y: 1},{x: 12, y: 1},{x: 2, y: 2},{x: 4, y: 2},{x: 7, y: 2},{x: 10, y: 2},{x: 11, y: 2},{x: 12, y: 2},{x: 2, y: 3},{x: 4, y: 3},{x: 7, y: 3},{x: 10, y: 3},{x: 12, y: 3},{x: 2, y: 4},{x: 4, y: 4},{x: 7, y: 4},{x: 10, y: 4},{x: 11, y: 4},{x: 12, y: 4}];
+
+	function setup()
+	{
+		canvasBoard[0][10].color = getColor();
+	}
+
+	function draw()
+	{
+		this.update();
+
+		background(backgroundColor);
+
+		this.drawText();
+		this.drawBoard(canvasBoard);
+		this.drawBoard(secretBoard);
+	}
+
+	function drawText()
+	{
+		fill('#000000');
+		ctx.strokeText('рисуй', canvas.width / 2, canvas.height / 2);
+	}
+
+	function drawBoard(board)
+	{
+		board.flat().forEach((cell) => {
+			fill(cell.color ?? '#0000');
+			font('bold 120px sans-serif');
+			ctx.fillRect(cell.x * cellWidth, cell.y * cellWidth, cellWidth, cellWidth);
+		});
+	}
+
+	function update()
+	{
+		for (let y = rows - 1; y >=0; y--)
+		{
+			for (let x = 0; x < columns; x++)
+			{
+				canvasBoard[y][x].color = canvasBoard[y - 1]?.[x]?.color;
+				if (canvasBoard[y][x].color && secretCells.find((cell) => cell.x === x && cell.y === y - rows + 6))
+				{
+					secretBoard[y][x].color = canvasBoard[y][x].color;
+				}
+			}
+		}
+
+		if (mousePressed)
+		{
+			const cell = getCell(canvasBoard, mouseX, mouseY);
+			if (cell)
+			{
+				cell.color = getColor();
+			}
+		}
+	}
+
+	function getColor()
+	{
+		return "hsl(" + 360 * Math.random() + ',' +
+					(65 + 30 * Math.random()) + '%,' + 
+					(65 + 30 * Math.random()) + '%)'
+		;
+	}
+
+	function getCell(board, x, y)
+	{
+		for (const cell of board.flat())
+		{
+			if (x > cellWidth * cell.x && x < cellWidth * cell.x + cellWidth && y > cellWidth * cell.y && y < cellWidth * cell.y + cellWidth)
+			{
+				return cell;
+			}
+		}
+
+		return null;
+	}
+
+</script>
+<script>
+//canvas
+const canvas = document.getElementById('canvas');
+canvas.height = canvas.parentElement.getBoundingClientRect().height;
+canvas.width = canvas.parentElement.getBoundingClientRect().width;
+const ctx = canvas.getContext('2d');
+ctx.textBaseline = "middle";
+ctx.textAlign = "center";
+
+//variables
+let mouseX = 0;
+let mouseY = 0;
+let mousePressed = false;
+
+//loop
+setup();
+draw();
+if (typeof fps === 'undefined')
+{
+	fps = 60;
+}
+setInterval(draw, 1000 / fps);
+
+//functions
+function background(color) {
+	fill(color);
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function stroke(color) {
+	ctx.strokeStyle = color;
+}
+
+function fill(color) {
+	ctx.fillStyle = color;
+}
+
+function font(options) {
+	ctx.font = options;
+}
+
+function circle(x, y, radius) {
+	ctx.beginPath();
+	ctx.arc(x, y, radius, 0, 2 * Math.PI, true)
+	ctx.fill();
+	ctx.closePath();
+}
+
+//event listeners
+window.addEventListener('mousemove', e => {
+	mouseX = e.clientX - canvas.getBoundingClientRect().x;
+	mouseY = e.clientY - canvas.getBoundingClientRect().y;
+});
+window.addEventListener('touchmove', e => {
+	mouseX = e.touches[0].clientX - canvas.getBoundingClientRect().x;
+	mouseY = e.touches[0].clientY - canvas.getBoundingClientRect().y;
+});
+
+window.addEventListener('mousedown', e => {
+	if (e.button === 0) mousePressed = true;
+});
+window.addEventListener('touchstart', () => {
+	mousePressed = true;
+});
+window.addEventListener('mouseup', e => {
+	if (e.button === 0) mousePressed = false;
+});
+window.addEventListener('touchend', () => {
+	mousePressed = false;
+});
+
+window.addEventListener('resize', () => {
+	canvas.height = canvas.parentElement.getBoundingClientRect().height;
+	canvas.width = canvas.parentElement.getBoundingClientRect().width;
+	draw();
+});
+</script>
+
+</body>
+</html>
