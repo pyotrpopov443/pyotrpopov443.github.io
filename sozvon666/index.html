@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>DVD</title>
+	<style>
+		* {
+			margin: 0;
+		}
+		canvas {
+			position: absolute;
+    		inset: 0;
+		}
+	</style>
+</head>
+<body>
+<canvas></canvas>
+<script>
+	const canvas = document.querySelector('canvas');
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	const ctx = canvas.getContext('2d');
+	ctx.font = 'bold 100px system-ui';
+
+	const text = 'ПТ8';
+	const metrics = ctx.measureText(text);
+
+	const dvd = {
+		text,
+		x: canvas.width / 2,
+		y: canvas.width / 2,
+		color: pickColor(),
+		height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
+		width: metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight,
+		vx: 2,
+		vy: 2,
+	}
+
+	function pickColor() {
+		r = random(100, 256);
+		g = random(100, 256);
+		b = random(100, 256);
+
+		return rgbToHex(r, g, b);
+	}
+
+	function random(min, max) {
+		return Math.floor(Math.random() * (max - min + 1) + min);
+	}
+
+	function rgbToHex(r, g, b) {
+		return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+	}
+
+	function componentToHex(c) {
+		const  hex = c.toString(16);
+
+		return hex.length == 1 ? "0" + hex : hex;
+	}
+
+	setInterval(() => {
+		let mult = 1;
+		if (mousePressed)
+		{
+			mult = 3;
+		}
+		dvd.x += dvd.vx * mult;
+		dvd.y += dvd.vy * mult;
+		if (dvd.x + dvd.width / 2 > canvas.width)
+		{
+			dvd.x = canvas.width - dvd.width / 2;
+			dvd.vx *= -1;
+			dvd.color = pickColor();
+		}
+		if (dvd.y - dvd.height / 2 > canvas.height)
+		{
+			dvd.y = canvas.height + dvd.height / 2;
+			dvd.vy *= -1;
+			dvd.color = pickColor();
+		}
+		if (dvd.x - dvd.width / 2 < 0)
+		{
+			dvd.x = dvd.width / 2;
+			dvd.vx *= -1;
+			dvd.color = pickColor();
+		}
+		if (dvd.y - dvd.height * (3 / 2) < 0)
+		{
+			dvd.y = dvd.height * (3 / 2);
+			dvd.vy *= -1;
+			dvd.color = pickColor();
+		}
+		ctx.clearRect(0, 0, canvas.width, canvas.height)
+		ctx.fillStyle = dvd.color;
+		ctx.fillText(dvd.text, dvd.x - dvd.width / 2, dvd.y - dvd.height / 2);
+	}, 1000 / 60);
+
+	
+	let mousePressed = false;
+
+	window.addEventListener('mousedown', e => {
+		if (e.button === 0) mousePressed = true;
+	});
+	window.addEventListener('touchstart', () => {
+		mousePressed = true;
+	});
+	window.addEventListener('mouseup', e => {
+		if (e.button === 0) mousePressed = false;
+	});
+	window.addEventListener('touchend', () => {
+		mousePressed = false;
+	});
+</script>
+</body>
+</html>
