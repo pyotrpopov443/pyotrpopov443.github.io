@@ -349,7 +349,10 @@
 	canvas.width = canvas.parentElement.getBoundingClientRect().width;
 	const ctx = canvas.getContext('2d');
 
-	ctx.font = 'bold 200px sans-serif';
+	let fontSize = 100;
+	ctx.font = `bold ${fontSize}px sans-serif`;
+	ctx.font = `bold ${fontSize * window.innerWidth / ctx.measureText('П Т 8').width * 0.8}px sans-serif`;
+
 	ctx.textBaseline = "middle";
 	ctx.textAlign = "center";
 	const points = textToPoints("П Т 8", canvas.width/2, canvas.height/2, 30);
