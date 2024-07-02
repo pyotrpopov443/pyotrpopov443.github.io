@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Butterfly</title>
+	<style>
+		@keyframes flap {
+			0% {
+				transform: rotateY(80deg);
+			}
+			100% {
+				transform: rotateY(-80deg);
+			}
+		}
+		body {
+			perspective: 1500px;
+			position: absolute;
+			width: 100vw;
+			height: 100vh;
+			height: -webkit-fill-available;
+			transform-origin: center center;
+			background-image: url(https://img.freepik.com/free-photo/cloud-sky-twilight-times_74190-4017.jpg);
+			background-position: center;
+			background-repeat: no-repeat;
+			background-size: 3000px auto;
+		}
+		.butterfly {
+			position: absolute;
+			transform-style: preserve-3d;
+			transform: rotateX(70deg);
+		}
+		.hover-container {
+			transform-style: preserve-3d;
+		}
+		.wing {
+			position: absolute;
+
+			transform-style: preserve-3d;
+			animation: flap 0.3s linear infinite alternate;
+			width: var(--size);
+			height: var(--size);
+			background: radial-gradient(ellipse at center, rgba(252,227,100,0.9) 65%,rgba(255,0,0,0.9) 100%);
+			border-bottom: 3px solid red;
+		}
+		.wing:after {
+			content: ' ';
+			position: absolute;
+			width: calc(var(--size) * 0.74);
+			height: calc(var(--size) * 0.88);
+			top: calc(var(--size) * -0.76);
+			left: calc(var(--size) * 0.25);
+			background: radial-gradient(ellipse at center, rgba(228, 203, 125, 0.9) 24%,rgba(248, 237, 110, 0.9) 27%,rgba(252,227,100,0.9) 64%,rgba(255, 0, 0, 0.9) 100%);
+			border-radius: 50% 114%;
+		}
+		.left {
+			transform-origin: right center;
+			border-radius: 177% 50%;
+			right: 0;
+		}
+		.right {
+			transform-origin: left center;
+			border-radius: 50% 177%;
+			left: calc(var(--size) * 0.1);
+			animation-direction: alternate-reverse;
+		}
+
+		.left:after {
+			left: calc(var(--size) * 0.25);
+			border-radius: 50% 114%;
+		}
+
+		.right:after {
+			left: 0;
+			border-radius: 114% 50%;
+		}
+
+		.body {
+			width: calc(var(--size) * 0.1);
+			height: calc(var(--size) * 0.8);
+			border-radius: calc(var(--size) * 0.05);
+			background-color: #333;
+			position: absolute;
+			left: 0;
+			top: calc(var(--size) * -0.3);
+		}
+
+		.head {
+			position: absolute;
+			width: calc(var(--size) * 0.2);
+			height: calc(var(--size) * 0.2);
+			border-radius: 50%;
+			background-color: #333;
+			left: calc(var(--size) * -0.05);
+			top: calc(var(--size) * 0.32);
+		}
+		.head:before {
+			content: '';
+			position: absolute;
+			display: inline-block;
+			width: 1px;
+			height: calc(var(--size) * 0.4);
+			background-color: #333;
+			transform: rotateX(34deg) rotateZ(20deg) translateY(calc(var(--size) * 0.2));
+			top: calc(var(--size) * -0.07);
+		}
+		.head:after {
+			content: '';
+			position: absolute;
+			display: inline-block;
+			width: 1px;
+			height: calc(var(--size) * 0.4);
+			background-color: #333;
+			transform: rotateX(34deg) rotateZ(-20deg) translateY(calc(var(--size) * 0.2));
+			top: calc(var(--size) * -0.07);
+			left: calc(var(--size) * 0.15);
+		}
+	</style>
+</head>
+<body>
+
+<script>
+	let mouseX = 0;
+	let mouseY = 0;
+	window.addEventListener('mousemove', e => {
+		mouseX = e.clientX;
+		mouseY = e.clientY;
+	});
+	window.addEventListener('touchmove', e => {
+		mouseX = e.touches[0].clientX;
+		mouseY = e.touches[0].clientY;
+	});
+	function map(x, inputFrom, inputTo, outputFrom, outputTo) {
+		return outputFrom + ((outputTo - outputFrom) / (inputTo - inputFrom)) * (x - inputFrom);
+	}
+
+	function constrain(value, lowerBound, upperBound) {
+		if (value < lowerBound) return lowerBound;
+		if (value > upperBound) return upperBound;
+		return value;
+	}
+	function Vector(x = 0, y = 0, z = 0) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		return this;
+	}
+	Vector.prototype.add = function(vector) {
+		this.x += vector.x;
+		this.y += vector.y;
+		this.z += vector.z;
+		return this;
+	}
+	Vector.prototype.sub = function(vector) {
+		this.x -= vector.x;
+		this.y -= vector.y;
+		this.z -= vector.z;
+		return this;
+	}
+	Vector.prototype.mult = function(lambda) {
+		this.x *= lambda;
+		this.y *= lambda;
+		this.z *= lambda;
+		return this;
+	}
+	Vector.prototype.dot = function(vector) {
+		return this.x * vector.x + this.y * vector.y + this.z * vector.z;
+	}
+	Vector.prototype.cross = function(vector) {
+		const a1 = this.x;
+		const a2 = this.y;
+		const a3 = this.z;
+		const b1 = vector.x;
+		const b2 = vector.y;
+		const b3 = vector.z;
+
+		this.x *= a2 * b3 - a3 * b2;
+		this.y *= a1 * b3 - a3 * b1;
+		this.z *= a1 * b2 - a2 * b1;
+		return this;
+	}
+	Vector.prototype.div = function(lambda) {
+		if (lambda === 0) return this;
+		this.x /= lambda;
+		this.y /= lambda;
+		this.z /= lambda;
+		return this;
+	}
+	Vector.prototype.rotate = function(angle) {
+		const x1 = this.x;
+		const y1 = this.y;
+		this.x = x1 * Math.cos(angle) - y1 * Math.sin(angle);
+		this.y = x1 * Math.sin(angle) + y1 * Math.cos(angle);
+		return this;
+	}
+	Vector.prototype.mag = function() {
+		return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+	}
+	Vector.prototype.setMag = function(newMag) {
+		let curMag = this.mag();
+		if (curMag === 0) return this;
+		this.x *= newMag / curMag;
+		this.y *= newMag / curMag;
+		this.z *= newMag / curMag;
+		return this;
+	}
+	Vector.prototype.normalize = function() {
+		return this.setMag(1);
+	}
+	Vector.prototype.limit = function(maxMag) {
+		if (this.mag() > maxMag) {
+			this.setMag(maxMag);
+		}
+		return this;
+	}
+	function vecAdd(vector1, vector2) {
+		return new Vector(vector1.x + vector2.x, vector1.y + vector2.y, vector1.z + vector2.z);
+	}
+	function vecSub(vector1, vector2) {
+		return new Vector(vector1.x - vector2.x, vector1.y - vector2.y, vector1.z - vector2.z);
+	}
+	function vecMult(vector, lambda) {
+		return new Vector(vector.x * lambda, vector.y * lambda, vector.z * lambda);
+	}
+	function vecCross(vector1, vector2) {
+		const a1 = vector1.x;
+		const a2 = vector1.y;
+		const a3 = vector1.z;
+		const b1 = vector2.x;
+		const b2 = vector2.y;
+		const b3 = vector2.z;
+		return new Vector(a2 * b3 - a3 * b2, a1 * b3 - a3 * b1, a1 * b2 - a2 * b1);
+	}
+	function distance(vector1, vector2) {
+		return vecSub(vector1, vector2).mag();
+	}
+
+	function Butterfly({ x, y, size }) {
+		this.position = new Vector(x, y);
+		this.target = new Vector(x, y);
+		this.velocity = new Vector();
+		this.maxspeed = 10;
+		this.maxforce = 1.5;
+		this.color = 'black';
+
+		this.container = document.createElement('div');
+		this.container.className = 'butterfly';
+		this.container.style.setProperty('--size', size + 'px');
+		this.container.innerHTML = '<div class="hover-container"><div class="left wing"></div><div class="right wing"></div><div class="body"></div><div class="head"></div></div>';
+		document.body.append(this.container);
+	}
+	Butterfly.prototype.update = function(mouse, mouseSize) {
+		const arrive = this.arrive(this.target);
+		const flee = this.flee(mouse, mouseSize);
+		flee.mult(5);
+		this.position.add(this.velocity);
+		this.velocity.add(arrive);
+		this.velocity.add(flee);
+		const deg = Math.atan2(this.velocity.y, this.velocity.x) * (180 / Math.PI) - 90;
+		this.container.style.transform = `rotateX(70deg) rotateZ(${deg}deg)`;
+		this.container.style.left = this.position.x + 'px';
+		this.container.style.top = this.position.y + 'px';
+	}
+	Butterfly.prototype.arrive = function(target) {
+		const desired = vecSub(target, this.position);
+		const d = desired.mag();
+		let speed = this.maxspeed;
+		if (d < 100) {
+			speed = map(d, 0, 100, 0, this.maxspeed);
+		}
+		desired.setMag(speed);
+		const steer = vecSub(desired, this.velocity);
+		steer.limit(this.maxforce);
+		return steer;
+	}
+	Butterfly.prototype.flee = function(target, targetSize) {
+		const desired = vecSub(target, this.position);
+		const d = desired.mag();
+		if (d < targetSize) {
+			desired.setMag(this.maxspeed);
+			desired.mult(-1);
+			const steer = vecSub(desired, this.velocity);
+			steer.limit(this.maxforce);
+			return steer;
+		} else {
+			return new Vector();
+		}
+	}
+	function textToPoints(txt, x, y, spacing, sort = false) {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		ctx.fillStyle = '#000000';
+		ctx.strokeText(txt, x, y);
+
+		const points = [];
+		const data32 = new Uint32Array(ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer);
+		for(let i = 0; i < data32.length; i++) {
+			if (data32[i] & 0xff000000) {
+				const pos = new Vector(i % canvas.width, i / canvas.width);
+				if (enoughSpace(pos)) {
+					points.push(pos);
+				}
+			}
+		}
+
+		function enoughSpace(vec) {
+			for (const point of points) {
+				if (vecSub(vec, point).mag() < spacing) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		if (!sort) {
+			return points;
+		}
+		const sortedPoints = [points[0]];
+		points.splice(0, 1);
+		while (points.length > 0) {
+			const closestPoint = closest(sortedPoints[sortedPoints.length - 1]);
+			sortedPoints.push(closestPoint.p);
+			points.splice(closestPoint.i, 1);
+		}
+		function closest(currentPoint) {
+			const closestPoint = {
+				i: points.length - 1,
+				p: points[points.length - 1]
+			};
+			let minDistance = distance(currentPoint, closestPoint.p);
+			for (let i = 0; i < points.length; i++) {
+				let d = distance(currentPoint, points[i]);
+				if (d > 0 && d < minDistance) {
+					minDistance = d;
+					closestPoint.i = i;
+					closestPoint.p = points[i];
+				}
+			}
+			return closestPoint;
+		}
+
+		return sortedPoints;
+	}
+
+
+	const canvas = document.createElement('canvas');
+	canvas.style.position = 'absolute';
+	document.body.append(canvas);
+	canvas.height = canvas.parentElement.getBoundingClientRect().height;
+	canvas.width = canvas.parentElement.getBoundingClientRect().width;
+	const ctx = canvas.getContext('2d');
+
+	ctx.font = 'bold 200px sans-serif';
+	ctx.textBaseline = "middle";
+	ctx.textAlign = "center";
+	const points = textToPoints("П Т 8", canvas.width/2, canvas.height/2, 30);
+	canvas.remove();
+
+	function randomIntFromInterval(min, max) { // min and max included 
+		return Math.floor(Math.random() * (max - min + 1) + min);
+	}
+
+	const butterflies = [];
+
+	const i = setInterval(() => {
+		if (points.length === 0)
+		{
+			clearInterval(i);
+			return;
+		}
+
+		const p = points.pop();
+		const butterfly = new Butterfly({
+			x: p.x,
+			y: p.y,
+			size: 20,
+		});
+		butterfly.position = new Vector(randomIntFromInterval(0, canvas.width), randomIntFromInterval(0, canvas.height));
+		butterflies.push(butterfly);
+	}, 16);
+
+	setInterval(() => {
+		const mouse = new Vector(mouseX, mouseY);
+		butterflies.forEach((butterfly) => butterfly.update(mouse, 50));
+	}, 16);
+</script>
+</body>
+</html>
