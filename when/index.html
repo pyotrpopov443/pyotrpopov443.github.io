@@ -35,10 +35,15 @@ diff -= hours * 3600000;
 const minutes = parseInt(diff / 60000, 10);
 diff -= minutes * 60000;
 const seconds = parseInt(diff / 1000, 10);
-timer.innerText = `${days}:${hours}:${minutes}:${seconds}`;
+timer.innerText = `${days}:${addZero(hours)}:${addZero(minutes)}:${addZero(seconds)}`;
+}
+function addZero(n)
+{
+return `0${n}`.slice(-2);
 }
 update();
 setTimeout(() => {
+update();
 setInterval(update, 1000);
 }, 1000 - new Date().getMilliseconds());
 </script>
