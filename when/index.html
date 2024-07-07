@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>когда?</title>
+</head>
+<body>
+
+<div style="
+position:fixed;
+font-family: system-ui;
+font-size: 20px;
+inset: 0;
+display: flex;
+align-items:center;
+justify-content: center;
+flex-direction: column;
+">
+<div>если не сейчас, то когда?</div>
+<div id="timer"></div>
+</div>
+
+<script>
+const timer = document.getElementById('timer');
+const target = new Date(1720807200000);
+function update()
+{
+const now = new Date();
+let diff = target.getTime() - now.getTime();
+const days = parseInt(diff / 86400000, 10);
+diff -= days * 86400000;
+const hours = parseInt(diff / 3600000, 10);
+diff -= hours * 3600000;
+const minutes = parseInt(diff / 60000, 10);
+diff -= minutes * 60000;
+const seconds = parseInt(diff / 1000, 10);
+timer.innerText = `${days}:${hours}:${minutes}:${seconds}`;
+}
+update();
+setTimeout(() => {
+setInterval(update, 1000);
+}, 1000 - new Date().getMilliseconds());
+</script>
+
+</body>
+</html>
