@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>приглашаю</title>
+</head>
+<body>
+
+<div id="img" style=" --fraq: 1024;"></div>
+
+<style>
+    #img {
+        position: fixed;
+        inset: 0;
+        background: url(./invite.png);
+        background-size: calc(100vw / var(--fraq)) calc(100vh / var(--fraq));
+    }
+</style>
+
+<script>
+	const img = document.getElementById('img');
+
+    img.addEventListener('click', () => {
+        const fraq = Number(img.style.getPropertyValue('--fraq'));
+
+        if (fraq > 1)
+        {
+            img.style.setProperty('--fraq', fraq / 2);
+        }
+    });
+</script>
+
+</body>
+</html>
